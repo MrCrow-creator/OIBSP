@@ -52,7 +52,6 @@ The admin panel runs separately and gives shop owners a way to manage incoming o
 | Backend | Node.js, Express.js |
 | Database | PostgreSQL (raw SQL via `pg`) |
 | Frontend | React 18, Vite |
-| Styling | Vanilla CSS with custom design system |
 | Auth | JWT, bcryptjs |
 | Payments | Razorpay |
 | Real-time | Socket.IO |
