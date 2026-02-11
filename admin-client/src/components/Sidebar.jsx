@@ -21,7 +21,7 @@ export default function Sidebar() {
         <aside className="sidebar">
             <div className="sidebar-logo">
                 <FaPizzaSlice size={28} />
-                <span>Pizza</span> Admin
+                <span>SliceCraft</span> Admin
             </div>
 
             <nav className="sidebar-nav">

@@ -1,5 +1,5 @@
 /* ===========================================
-   Pizza App - Design System & Global Styles
+   SliceCraft — Design System & Global Styles
    =========================================== */
 
 /* CSS Variables - Design Tokens */
@@ -716,6 +716,17 @@ ol {
   padding: var(--spacing-8);
 }
 
+.admin-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.admin-content {
+  flex: 1;
+  margin-left: 260px;
+  padding: var(--spacing-8);
+}
+
 /* ===========================================
    Page Specific Styles
    =========================================== */
@@ -757,6 +768,25 @@ ol {
   font-size: var(--font-size-xl);
   opacity: 0.9;
   margin-bottom: var(--spacing-8);
+}
+
+.hero-floating {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.hero-float-item {
+  position: absolute;
+  font-size: 2.5rem;
+  animation: floatBounce 4s ease-in-out infinite;
+  opacity: 0.3;
+}
+
+@keyframes floatBounce {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-20px) rotate(15deg); }
 }
 
 /* Pizza Card */
@@ -1082,6 +1112,20 @@ ol {
 .slide-down {
   animation: slideDown 0.3s ease;
 }
+
+@keyframes bounceIn {
+  0% { transform: scale(0.8); opacity: 0; }
+  60% { transform: scale(1.05); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.bounce-in {
+  animation: bounceIn 0.5s ease;
+}
+
+.fade-in-delay-1 { animation: fadeIn 0.4s ease 0.1s both; }
+.fade-in-delay-2 { animation: fadeIn 0.4s ease 0.2s both; }
+.fade-in-delay-3 { animation: fadeIn 0.4s ease 0.3s both; }
 
 /* ===========================================
    Responsive Design

@@ -174,4 +174,39 @@ async function getOrderItems(orderId) {
     return items;
 }
 
+// Cancel an order (user can cancel only if PENDING or RECEIVED)
+router.patch('/:id/cancel', authenticate, isUser, async (req, res) => {
+    try {
+        const order = await db.getOne(
+            'SELECT * FROM orders WHERE id = $1 AND user_id = $2',
+            [req.params.id, req.user.id]
+        );
+
+        if (!order) {
+            return res.status(404).json({ success: false, message: 'Order not found' });
+        }
+
+        if (!['PENDING', 'RECEIVED'].includes(order.status)) {
+            return res.status(400).json({
+                success: false,
+                message: 'This order can no longer be cancelled',
+            });
+        }
+
+        await db.query(
+            'UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2',
+            ['CANCELLED', order.id]
+        );
+
+        // Notify via socket
+        const io = req.app.get('io');
+        io.emit('order-status-update', { orderId: order.id, status: 'CANCELLED' });
+
+        res.json({ success: true, message: 'Order cancelled' });
+    } catch (error) {
+        console.error('Cancel order error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
 module.exports = router;

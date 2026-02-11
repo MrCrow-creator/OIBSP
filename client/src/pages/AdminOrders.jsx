@@ -3,233 +3,179 @@ import AdminSidebar from '../components/AdminSidebar';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import { FaBoxOpen, FaUtensils, FaTruck, FaCheckCircle, FaClock } from 'react-icons/fa';
+import { getStatusConfig, ORDER_STATUS } from '../utils/constants';
+import { FaFilter, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
 export default function AdminOrders() {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState('ALL');
+    const [statusFilter, setStatusFilter] = useState('ALL');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
     const { socket } = useAuth();
+
+    const PAGE_SIZE = 10;
 
     useEffect(() => {
         fetchOrders();
-    }, []);
+    }, [statusFilter, currentPage]);
 
     useEffect(() => {
         if (socket) {
-            socket.on('new-order', () => {
-                fetchOrders();
-                toast.success('New order received! 🍕');
-            });
-
-            return () => {
-                socket.off('new-order');
-            };
+            socket.on('new-order', () => fetchOrders());
+            return () => socket.off('new-order');
         }
     }, [socket]);
 
     const fetchOrders = async () => {
         try {
-            const response = await api.get('/admin/orders');
+            const params = new URLSearchParams({ page: currentPage, limit: PAGE_SIZE });
+            if (statusFilter !== 'ALL') params.append('status', statusFilter);
+            const response = await api.get(`/admin/orders?${params}`);
             setOrders(response.data.data);
+            if (response.data.total) {
+                setTotalPages(Math.ceil(response.data.total / PAGE_SIZE));
+            }
         } catch (error) {
-            toast.error('Failed to fetch orders');
+            console.error('Failed to fetch orders:', error);
         } finally {
             setLoading(false);
         }
     };
 
-    const updateStatus = async (orderId, newStatus) => {
+    const updateOrderStatus = async (orderId, newStatus) => {
         try {
-            await api.put(`/admin/orders/${orderId}/status`, { status: newStatus });
+            await api.patch(`/admin/orders/${orderId}/status`, { status: newStatus });
             setOrders((prev) =>
-                prev.map((order) =>
-                    order.id === orderId ? { ...order, status: newStatus } : order
-                )
+                prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
             );
-            toast.success('Order status updated!');
+            toast.success(`Status updated to ${getStatusConfig(newStatus).label}`);
         } catch (error) {
             toast.error('Failed to update status');
         }
     };
 
-    const getStatusConfig = (status) => {
-        const config = {
-            RECEIVED: { icon: FaBoxOpen, color: 'var(--color-info)', next: 'IN_KITCHEN', nextLabel: 'Start Cooking' },
-            IN_KITCHEN: { icon: FaUtensils, color: 'var(--color-warning)', next: 'SENT_TO_DELIVERY', nextLabel: 'Send to Delivery' },
-            SENT_TO_DELIVERY: { icon: FaTruck, color: 'var(--color-info)', next: 'DELIVERED', nextLabel: 'Mark Delivered' },
-            DELIVERED: { icon: FaCheckCircle, color: 'var(--color-success)', next: null, nextLabel: null },
-            PENDING: { icon: FaClock, color: 'var(--color-gray-500)', next: 'RECEIVED', nextLabel: 'Accept Order' },
-        };
-        return config[status] || config.PENDING;
-    };
-
-    const getStatusLabel = (status) => {
-        const labels = {
-            PENDING: 'Pending',
-            RECEIVED: 'Received',
-            IN_KITCHEN: 'In Kitchen',
-            SENT_TO_DELIVERY: 'Out for Delivery',
-            DELIVERED: 'Delivered',
-            CANCELLED: 'Cancelled',
-        };
-        return labels[status] || status;
-    };
-
-    const filteredOrders = filter === 'ALL'
-        ? orders
-        : orders.filter((order) => order.status === filter);
-
-    const filterButtons = [
-        { value: 'ALL', label: 'All' },
-        { value: 'RECEIVED', label: 'Received' },
-        { value: 'IN_KITCHEN', label: 'In Kitchen' },
-        { value: 'SENT_TO_DELIVERY', label: 'Delivery' },
-        { value: 'DELIVERED', label: 'Delivered' },
-    ];
+    const statusOptions = ['ALL', ...Object.keys(ORDER_STATUS)];
 
     return (
-        <div>
+        <div className="admin-layout">
             <AdminSidebar />
 
-            <main className="main-content">
+            <main className="admin-content">
                 <div className="flex items-center justify-between" style={{ marginBottom: 'var(--spacing-6)' }}>
                     <h1 style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 700 }}>
-                        Order Management 📋
+                        Orders 📋
                     </h1>
-                    <span style={{ color: 'var(--color-gray-600)' }}>
-                        {filteredOrders.length} order(s)
-                    </span>
                 </div>
 
-                {/* Filter Buttons */}
-                <div className="flex gap-2" style={{ marginBottom: 'var(--spacing-6)' }}>
-                    {filterButtons.map((btn) => (
-                        <button
-                            key={btn.value}
-                            onClick={() => setFilter(btn.value)}
-                            className={`btn ${filter === btn.value ? 'btn-primary' : 'btn-ghost'}`}
-                        >
-                            {btn.label}
-                        </button>
-                    ))}
+                {/* Filter Bar */}
+                <div className="card card-body" style={{ marginBottom: 'var(--spacing-6)' }}>
+                    <div className="flex items-center gap-4 flex-wrap">
+                        <FaFilter style={{ color: 'var(--color-gray-400)' }} />
+                        {statusOptions.map((status) => (
+                            <button
+                                key={status}
+                                onClick={() => { setStatusFilter(status); setCurrentPage(1); }}
+                                className={`btn btn-sm ${statusFilter === status ? 'btn-primary' : 'btn-ghost'}`}
+                            >
+                                {status === 'ALL' ? 'All' : getStatusConfig(status).label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
+                {/* Orders Table */}
                 {loading ? (
                     <div className="flex items-center justify-center" style={{ minHeight: '40vh' }}>
                         <div className="spinner-lg"></div>
                     </div>
-                ) : filteredOrders.length === 0 ? (
+                ) : orders.length === 0 ? (
                     <div className="card card-body text-center" style={{ padding: 'var(--spacing-12)' }}>
-                        <h2 style={{ fontSize: 'var(--font-size-xl)', marginBottom: 'var(--spacing-4)' }}>
-                            No orders found
-                        </h2>
-                        <p style={{ color: 'var(--color-gray-600)' }}>
-                            {filter === 'ALL' ? 'No orders have been placed yet.' : `No ${filter.toLowerCase()} orders.`}
-                        </p>
+                        <p style={{ color: 'var(--color-gray-500)' }}>No orders found</p>
                     </div>
                 ) : (
-                    <div className="flex flex-col gap-4">
-                        {filteredOrders.map((order) => {
-                            const statusConfig = getStatusConfig(order.status);
-                            const StatusIcon = statusConfig.icon;
+                    <>
+                        <div className="card">
+                            <div className="card-body" style={{ padding: 0 }}>
+                                <table className="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Order ID</th>
+                                            <th>Customer</th>
+                                            <th>Items</th>
+                                            <th>Total</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {orders.map((order) => {
+                                            const statusInfo = getStatusConfig(order.status);
+                                            const StatusIcon = statusInfo.icon;
 
-                            return (
-                                <div key={order.id} className="card">
-                                    <div className="card-header flex items-center justify-between">
-                                        <div className="flex items-center gap-4">
-                                            <span style={{ fontWeight: 600, fontSize: 'var(--font-size-lg)' }}>
-                                                #{order.id.slice(-8).toUpperCase()}
-                                            </span>
-                                            <span
-                                                className="badge"
-                                                style={{
-                                                    background: `${statusConfig.color}20`,
-                                                    color: statusConfig.color,
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '0.25rem'
-                                                }}
-                                            >
-                                                <StatusIcon size={12} />
-                                                {getStatusLabel(order.status)}
-                                            </span>
-                                        </div>
-                                        <span style={{ color: 'var(--color-gray-600)', fontSize: 'var(--font-size-sm)' }}>
-                                            {new Date(order.createdAt).toLocaleString()}
-                                        </span>
-                                    </div>
-
-                                    <div className="card-body">
-                                        <div className="grid gap-6" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                                            {/* Customer Info */}
-                                            <div>
-                                                <h4 style={{ fontWeight: 600, marginBottom: 'var(--spacing-2)', color: 'var(--color-gray-600)', fontSize: 'var(--font-size-sm)' }}>
-                                                    CUSTOMER
-                                                </h4>
-                                                <p style={{ fontWeight: 500 }}>{order.user.name}</p>
-                                                <p style={{ color: 'var(--color-gray-600)', fontSize: 'var(--font-size-sm)' }}>
-                                                    {order.user.email}
-                                                </p>
-                                            </div>
-
-                                            {/* Order Summary */}
-                                            <div>
-                                                <h4 style={{ fontWeight: 600, marginBottom: 'var(--spacing-2)', color: 'var(--color-gray-600)', fontSize: 'var(--font-size-sm)' }}>
-                                                    ORDER DETAILS
-                                                </h4>
-                                                <p>{order.items.length} pizza(s)</p>
-                                                <p style={{ fontSize: 'var(--font-size-lg)', fontWeight: 700, color: 'var(--color-primary)' }}>
-                                                    Total: ₹{order.totalPrice.toFixed(2)}
-                                                </p>
-                                            </div>
-                                        </div>
-
-                                        {/* Order Items */}
-                                        <div style={{ marginTop: 'var(--spacing-6)' }}>
-                                            <h4 style={{ fontWeight: 600, marginBottom: 'var(--spacing-3)', color: 'var(--color-gray-600)', fontSize: 'var(--font-size-sm)' }}>
-                                                ITEMS
-                                            </h4>
-                                            <div className="flex flex-col gap-2">
-                                                {order.items.map((item) => (
-                                                    <div key={item.id} className="flex items-center gap-3" style={{ padding: 'var(--spacing-2)', background: 'var(--color-gray-50)', borderRadius: 'var(--radius-md)' }}>
-                                                        <span>🍕</span>
-                                                        <span style={{ fontWeight: 500 }}>
-                                                            {item.base.name} + {item.sauce.name} + {item.cheese.name}
+                                            return (
+                                                <tr key={order.id}>
+                                                    <td style={{ fontWeight: 600 }}>
+                                                        #{order.id.slice(-8).toUpperCase()}
+                                                        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-gray-500)' }}>
+                                                            {new Date(order.created_at).toLocaleString()}
+                                                        </div>
+                                                    </td>
+                                                    <td>{order.user_name || order.user_email}</td>
+                                                    <td>{order.item_count || '—'}</td>
+                                                    <td style={{ fontWeight: 600 }}>
+                                                        ₹{parseFloat(order.total_price).toFixed(2)}
+                                                    </td>
+                                                    <td>
+                                                        <span
+                                                            className="badge flex items-center gap-2"
+                                                            style={{ background: `${statusInfo.color}18`, color: statusInfo.color }}
+                                                        >
+                                                            <StatusIcon size={12} />
+                                                            {statusInfo.label}
                                                         </span>
-                                                        {item.veggies.length > 0 && (
-                                                            <span style={{ color: 'var(--color-gray-600)', fontSize: 'var(--font-size-sm)' }}>
-                                                                +{item.veggies.length} veggies
-                                                            </span>
+                                                    </td>
+                                                    <td>
+                                                        {statusInfo.next && (
+                                                            <button
+                                                                onClick={() => updateOrderStatus(order.id, statusInfo.next)}
+                                                                className="btn btn-sm btn-primary"
+                                                            >
+                                                                {statusInfo.nextLabel}
+                                                            </button>
                                                         )}
-                                                        {item.meats.length > 0 && (
-                                                            <span style={{ color: 'var(--color-gray-600)', fontSize: 'var(--font-size-sm)' }}>
-                                                                +{item.meats.length} meats
-                                                            </span>
-                                                        )}
-                                                        <span style={{ marginLeft: 'auto', fontWeight: 500 }}>
-                                                            x{item.quantity}
-                                                        </span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
 
-                                    {statusConfig.next && (
-                                        <div className="card-footer flex justify-end">
-                                            <button
-                                                onClick={() => updateStatus(order.id, statusConfig.next)}
-                                                className="btn btn-primary"
-                                            >
-                                                {statusConfig.nextLabel}
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
+                        {/* Pagination */}
+                        {totalPages > 1 && (
+                            <div className="flex items-center justify-center gap-4" style={{ marginTop: 'var(--spacing-6)' }}>
+                                <button
+                                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                    className="btn btn-ghost btn-sm"
+                                    disabled={currentPage === 1}
+                                >
+                                    <FaChevronLeft /> Previous
+                                </button>
+                                <span style={{ color: 'var(--color-gray-600)' }}>
+                                    Page {currentPage} of {totalPages}
+                                </span>
+                                <button
+                                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                    className="btn btn-ghost btn-sm"
+                                    disabled={currentPage === totalPages}
+                                >
+                                    Next <FaChevronRight />
+                                </button>
+                            </div>
+                        )}
+                    </>
                 )}
             </main>
         </div>

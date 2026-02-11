@@ -12,7 +12,7 @@ export default function Navbar() {
             <div className="container flex items-center justify-between">
                 <Link to="/" className="navbar-brand">
                     <FaPizzaSlice />
-                    <span>Pizza App</span>
+                    <span>SliceCraft</span>
                 </Link>
 
                 <div className="navbar-nav">

@@ -43,7 +43,7 @@ app.use('/api/admin', adminRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
-    res.json({ success: true, message: 'Pizza API is running! 🍕' });
+    res.json({ success: true, message: 'SliceCraft API is live! 🍕' });
 });
 
 // Socket.io connection
@@ -80,8 +80,8 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
-    console.log(`🍕 Pizza server running on port ${PORT}`);
-    console.log(`📡 Socket.io ready for real-time updates`);
+    console.log(`🍕 SliceCraft server running on port ${PORT}`);
+    console.log(`📡 Real-time order updates enabled`);
 });
 
 // Graceful shutdown

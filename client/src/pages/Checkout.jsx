@@ -1,43 +1,51 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import { FaTrash, FaMinus, FaPlus, FaCreditCard } from 'react-icons/fa';
+import { FaTrash, FaMinus, FaPlus, FaCreditCard, FaMapMarkerAlt } from 'react-icons/fa';
 
 export default function Checkout() {
     const { cart, removeFromCart, updateQuantity, clearCart, getTotal } = useCart();
+    const { user } = useAuth();
     const [loading, setLoading] = useState(false);
+    const [address, setAddress] = useState({ line1: '', line2: '', city: '', pincode: '' });
     const navigate = useNavigate();
 
     const handlePayment = async () => {
         if (cart.length === 0) {
-            toast.error('Your cart is empty');
+            toast.error('Your cart is empty!');
+            return;
+        }
+
+        if (!address.line1 || !address.city || !address.pincode) {
+            toast.error('Please fill in your delivery address');
             return;
         }
 
         setLoading(true);
 
         try {
-            // Create Razorpay order
+            // Initiate Razorpay order
             const orderResponse = await api.post('/payments/create-order', {
                 amount: getTotal(),
             });
 
             const { order, key } = orderResponse.data;
 
-            // Configure Razorpay
+            // Launch Razorpay checkout
             const options = {
                 key,
                 amount: order.amount,
                 currency: order.currency,
-                name: 'Pizza App',
+                name: 'SliceCraft',
                 description: 'Custom Pizza Order',
                 order_id: order.id,
                 handler: async (response) => {
                     try {
-                        // Verify payment
+                        // Verify payment signature
                         const verifyResponse = await api.post('/payments/verify', {
                             razorpay_order_id: response.razorpay_order_id,
                             razorpay_payment_id: response.razorpay_payment_id,
@@ -45,7 +53,7 @@ export default function Checkout() {
                         });
 
                         if (verifyResponse.data.success) {
-                            // Create order in database
+                            // Persist order in database
                             const items = cart.map((item) => ({
                                 baseId: item.baseId,
                                 sauceId: item.sauceId,
@@ -64,17 +72,16 @@ export default function Checkout() {
                             });
 
                             clearCart();
-                            toast.success('Order placed successfully! 🍕');
+                            toast.success('Order placed! Your pizza is on its way 🍕');
                             navigate('/orders');
                         }
                     } catch (error) {
-                        toast.error('Payment verification failed');
+                        toast.error('Payment verification failed. Please contact support.');
                     }
                 },
                 prefill: {
-                    name: 'Test User',
-                    email: 'test@example.com',
-                    contact: '9999999999',
+                    name: user?.name || '',
+                    email: user?.email || '',
                 },
                 theme: {
                     color: '#e53935',
@@ -84,7 +91,7 @@ export default function Checkout() {
             const razorpay = new window.Razorpay(options);
             razorpay.open();
         } catch (error) {
-            toast.error('Failed to initiate payment');
+            toast.error('Could not initiate payment. Try again.');
         } finally {
             setLoading(false);
         }
@@ -105,10 +112,10 @@ export default function Checkout() {
                             Your cart is empty
                         </h2>
                         <p style={{ color: 'var(--color-gray-600)', marginBottom: 'var(--spacing-6)' }}>
-                            Start building your perfect pizza!
+                            Head over to the pizza builder and craft something delicious!
                         </p>
                         <button onClick={() => navigate('/build-pizza')} className="btn btn-primary">
-                            Build Pizza
+                            Build a Pizza
                         </button>
                     </div>
                 ) : (
@@ -202,6 +209,60 @@ export default function Checkout() {
                             >
                                 + Add Another Pizza
                             </button>
+
+                            {/* Delivery Address */}
+                            <div className="card" style={{ marginTop: 'var(--spacing-6)' }}>
+                                <div className="card-header">
+                                    <h3 className="flex items-center gap-2" style={{ fontWeight: 600 }}>
+                                        <FaMapMarkerAlt color="var(--color-primary)" /> Delivery Address
+                                    </h3>
+                                </div>
+                                <div className="card-body">
+                                    <div className="form-group">
+                                        <label className="form-label">Address Line 1 *</label>
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            placeholder="House/Flat No., Street"
+                                            value={address.line1}
+                                            onChange={(e) => setAddress({ ...address, line1: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Address Line 2</label>
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            placeholder="Landmark, Area (optional)"
+                                            value={address.line2}
+                                            onChange={(e) => setAddress({ ...address, line2: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="form-group">
+                                            <label className="form-label">City *</label>
+                                            <input
+                                                type="text"
+                                                className="form-input"
+                                                placeholder="City"
+                                                value={address.city}
+                                                onChange={(e) => setAddress({ ...address, city: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">PIN Code *</label>
+                                            <input
+                                                type="text"
+                                                className="form-input"
+                                                placeholder="6-digit PIN"
+                                                maxLength={6}
+                                                value={address.pincode}
+                                                onChange={(e) => setAddress({ ...address, pincode: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         {/* Order Summary */}
@@ -248,13 +309,13 @@ export default function Checkout() {
                                             </span>
                                         ) : (
                                             <>
-                                                <FaCreditCard /> Pay with Razorpay
+                                                <FaCreditCard /> Pay ₹{getTotal().toFixed(2)}
                                             </>
                                         )}
                                     </button>
 
                                     <p className="text-center" style={{ marginTop: 'var(--spacing-4)', fontSize: 'var(--font-size-sm)', color: 'var(--color-gray-500)' }}>
-                                        🔒 Secure payment powered by Razorpay
+                                        🔒 Secure payment via Razorpay
                                     </p>
                                 </div>
                             </div>

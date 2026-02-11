@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { FaPizzaSlice, FaPlus, FaHistory, FaFire } from 'react-icons/fa';
+import { getStatusConfig } from '../utils/constants';
 
 export default function UserDashboard() {
     const { user } = useAuth();
@@ -28,30 +29,6 @@ export default function UserDashboard() {
         } finally {
             setLoading(false);
         }
-    };
-
-    const getStatusColor = (status) => {
-        const colors = {
-            PENDING: 'badge-warning',
-            RECEIVED: 'badge-info',
-            IN_KITCHEN: 'badge-warning',
-            SENT_TO_DELIVERY: 'badge-info',
-            DELIVERED: 'badge-success',
-            CANCELLED: 'badge-error',
-        };
-        return colors[status] || 'badge-info';
-    };
-
-    const getStatusLabel = (status) => {
-        const labels = {
-            PENDING: 'Pending',
-            RECEIVED: 'Received',
-            IN_KITCHEN: 'In Kitchen',
-            SENT_TO_DELIVERY: 'Out for Delivery',
-            DELIVERED: 'Delivered',
-            CANCELLED: 'Cancelled',
-        };
-        return labels[status] || status;
     };
 
     return (

@@ -8,24 +8,47 @@ const router = express.Router();
 // Apply auth middleware to all routes
 router.use(authenticate, isAdmin);
 
-// Get all orders
+// Get all orders (with pagination + optional status filter)
 router.get('/orders', async (req, res) => {
     try {
-        const orders = await getAll(
-            `SELECT o.*, u.name as user_name, u.email as user_email
-       FROM orders o
-       JOIN users u ON o.user_id = u.id
-       ORDER BY o.created_at DESC`
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const offset = (page - 1) * limit;
+        const status = req.query.status;
+
+        let whereClause = '';
+        const params = [];
+
+        if (status) {
+            whereClause = 'WHERE o.status = $1';
+            params.push(status);
+        }
+
+        // Total count
+        const countResult = await getOne(
+            `SELECT COUNT(*) as total FROM orders o ${whereClause}`,
+            params
         );
 
-        for (const order of orders) {
-            order.user = { name: order.user_name, email: order.user_email };
-            order.items = await getOrderItems(order.id);
-        }
+        // Paginated result
+        const queryParams = [...params, limit, offset];
+        const orders = await getAll(
+            `SELECT o.*, u.name as user_name, u.email as user_email,
+                    (SELECT COUNT(*) FROM order_items WHERE order_id = o.id) as item_count
+             FROM orders o
+             JOIN users u ON o.user_id = u.id
+             ${whereClause}
+             ORDER BY o.created_at DESC
+             LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+            queryParams
+        );
 
         res.json({
             success: true,
             data: orders,
+            total: parseInt(countResult.total),
+            page,
+            limit,
         });
     } catch (error) {
         console.error('Get orders error:', error);

@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
-import { FaCheckCircle, FaUtensils, FaTruck, FaBoxOpen, FaClock } from 'react-icons/fa';
+import toast from 'react-hot-toast';
+import { getStatusConfig, TRACKER_STEPS } from '../utils/constants';
 
 export default function Orders() {
     const [orders, setOrders] = useState([]);
@@ -40,30 +41,25 @@ export default function Orders() {
         }
     };
 
-    const getStatusInfo = (status) => {
-        const statusMap = {
-            PENDING: { icon: FaClock, label: 'Pending', color: 'var(--color-gray-500)', step: 0 },
-            RECEIVED: { icon: FaBoxOpen, label: 'Order Received', color: 'var(--color-info)', step: 1 },
-            IN_KITCHEN: { icon: FaUtensils, label: 'In the Kitchen', color: 'var(--color-warning)', step: 2 },
-            SENT_TO_DELIVERY: { icon: FaTruck, label: 'Out for Delivery', color: 'var(--color-info)', step: 3 },
-            DELIVERED: { icon: FaCheckCircle, label: 'Delivered', color: 'var(--color-success)', step: 4 },
-            CANCELLED: { icon: FaClock, label: 'Cancelled', color: 'var(--color-error)', step: 0 },
-        };
-        return statusMap[status] || statusMap.PENDING;
+    const handleCancel = async (orderId) => {
+        if (!window.confirm('Are you sure you want to cancel this order?')) return;
+        try {
+            await api.patch(`/orders/${orderId}/cancel`);
+            setOrders((prev) =>
+                prev.map((o) => (o.id === orderId ? { ...o, status: 'CANCELLED' } : o))
+            );
+            toast.success('Order cancelled');
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Could not cancel order');
+        }
     };
 
     const OrderStatusTracker = ({ status }) => {
-        const statusInfo = getStatusInfo(status);
-        const steps = [
-            { icon: FaBoxOpen, label: 'Received' },
-            { icon: FaUtensils, label: 'Kitchen' },
-            { icon: FaTruck, label: 'Delivery' },
-            { icon: FaCheckCircle, label: 'Delivered' },
-        ];
+        const statusInfo = getStatusConfig(status);
 
         return (
             <div className="order-status">
-                {steps.map((step, index) => {
+                {TRACKER_STEPS.map((step, index) => {
                     const isCompleted = statusInfo.step > index + 1;
                     const isActive = statusInfo.step === index + 1;
                     const Icon = step.icon;
@@ -103,13 +99,13 @@ export default function Orders() {
                             No orders yet
                         </h2>
                         <p style={{ color: 'var(--color-gray-600)' }}>
-                            Start building your first pizza!
+                            Time to craft your first pizza!
                         </p>
                     </div>
                 ) : (
                     <div className="flex flex-col gap-6">
                         {orders.map((order) => {
-                            const statusInfo = getStatusInfo(order.status);
+                            const statusInfo = getStatusConfig(order.status);
 
                             return (
                                 <div key={order.id} className="card">
@@ -122,12 +118,23 @@ export default function Orders() {
                                                 {new Date(order.created_at).toLocaleString()}
                                             </span>
                                         </div>
-                                        <span
-                                            className="badge"
-                                            style={{ background: `${statusInfo.color}20`, color: statusInfo.color }}
-                                        >
-                                            {statusInfo.label}
-                                        </span>
+                                        <div className="flex items-center gap-3">
+                                            <span
+                                                className="badge"
+                                                style={{ background: `${statusInfo.color}20`, color: statusInfo.color }}
+                                            >
+                                                {statusInfo.label}
+                                            </span>
+                                            {(order.status === 'PENDING' || order.status === 'RECEIVED') && (
+                                                <button
+                                                    onClick={() => handleCancel(order.id)}
+                                                    className="btn btn-ghost btn-sm"
+                                                    style={{ color: 'var(--color-error)' }}
+                                                >
+                                                    Cancel
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
 
                                     <div className="card-body">

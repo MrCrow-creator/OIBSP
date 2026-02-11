@@ -18,7 +18,7 @@ export default function AdminSidebar() {
         <aside className="sidebar">
             <div className="sidebar-brand">
                 <FaPizzaSlice size={28} />
-                <span>Pizza Admin</span>
+                <span>SliceCraft Admin</span>
             </div>
 
             <nav className="sidebar-nav">

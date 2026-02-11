@@ -1,161 +1,180 @@
 const nodemailer = require('nodemailer');
 
-// Create transporter - use environment variables or console logging for development
+// Configure email transport
 const createTransporter = () => {
-    // Check if email credentials are configured
-    if (process.env.EMAIL_USER && process.env.EMAIL_USER !== 'your_email@gmail.com') {
-        return nodemailer.createTransport({
-            host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-            port: parseInt(process.env.EMAIL_PORT) || 587,
-            secure: false,
-            auth: {
-                user: process.env.EMAIL_USER,
-                pass: process.env.EMAIL_PASS,
-            },
-        });
-    }
+  if (process.env.NODE_ENV === 'development' || !process.env.EMAIL_USER) {
+    // In development, log emails to console
     return null;
+  }
+
+  return nodemailer.createTransport({
+    service: process.env.EMAIL_SERVICE || 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
 };
 
 const transporter = createTransporter();
 
-// Send email or log to console in development
-const sendEmail = async ({ to, subject, html }) => {
-    if (transporter) {
-        try {
-            await transporter.sendMail({
-                from: `"Pizza App" <${process.env.EMAIL_USER}>`,
-                to,
-                subject,
-                html,
-            });
-            console.log(`📧 Email sent to ${to}: ${subject}`);
-            return true;
-        } catch (error) {
-            console.error('Email sending failed:', error);
-            return false;
-        }
-    } else {
-        // Development mode - log email to console
-        console.log('\n' + '='.repeat(60));
-        console.log('📧 EMAIL (Development Mode)');
-        console.log('='.repeat(60));
-        console.log(`To: ${to}`);
-        console.log(`Subject: ${subject}`);
-        console.log('-'.repeat(60));
-        console.log('Content:');
-        console.log(html.replace(/<[^>]*>/g, '')); // Strip HTML for console
-        console.log('='.repeat(60) + '\n');
-        return true;
-    }
+const sendEmail = async (to, subject, html) => {
+  if (!transporter) {
+    console.log('\n📧 ═══ SliceCraft Mail ═══');
+    console.log(`   To: ${to}`);
+    console.log(`   Subject: ${subject}`);
+    console.log('   ───────────────────────');
+    console.log(`   ${html.replace(/<[^>]*>/g, '').substring(0, 200)}...`);
+    console.log('═══════════════════════════\n');
+    return;
+  }
+
+  await transporter.sendMail({
+    from: `"SliceCraft" <${process.env.EMAIL_USER}>`,
+    to,
+    subject,
+    html,
+  });
 };
 
-// Email templates
+// ── Verification Email ──
 const sendVerificationEmail = async (email, name, token) => {
-    const verificationUrl = `${process.env.CLIENT_URL}/verify-email?token=${token}`;
+  const verifyUrl = `${process.env.CLIENT_URL}/verify-email?token=${token}`;
 
-    return sendEmail({
-        to: email,
-        subject: '🍕 Verify your Pizza App account',
-        html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #e53935;">Welcome to Pizza App! 🍕</h1>
-        <p>Hi ${name},</p>
-        <p>Thank you for registering! Please verify your email address to start ordering delicious pizzas.</p>
-        <a href="${verificationUrl}" 
-           style="display: inline-block; background-color: #e53935; color: white; padding: 12px 24px; 
-                  text-decoration: none; border-radius: 4px; margin: 20px 0;">
-          Verify Email
-        </a>
-        <p>Or copy this link: ${verificationUrl}</p>
-        <p>This link expires in 24 hours.</p>
-        <p>If you didn't create this account, please ignore this email.</p>
-      </div>
-    `,
-    });
+  const html = `
+        <div style="font-family: 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;">
+            <h1 style="color: #e53935; font-size: 28px; margin-bottom: 8px;">Welcome to SliceCraft! 🍕</h1>
+            <p style="font-size: 16px; color: #555;">Hey ${name},</p>
+            <p style="font-size: 15px; color: #666;">
+                Thanks for joining us! Verify your email to start crafting your perfect pizza.
+            </p>
+            <a href="${verifyUrl}" 
+               style="display: inline-block; margin: 24px 0; padding: 14px 32px; 
+                      background: linear-gradient(135deg, #e53935, #ff9800); color: #fff; 
+                      text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">
+                Verify My Email
+            </a>
+            <p style="font-size: 13px; color: #999; margin-top: 24px;">
+                If the button doesn't work, paste this link in your browser:<br/>
+                <a href="${verifyUrl}" style="color: #e53935;">${verifyUrl}</a>
+            </p>
+            <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+            <p style="font-size: 12px; color: #bbb; text-align: center;">
+                SliceCraft — Craft your perfect slice.
+            </p>
+        </div>
+    `;
+
+  await sendEmail(email, 'Verify your SliceCraft account', html);
 };
 
+// ── Password Reset Email ──
 const sendPasswordResetEmail = async (email, name, token) => {
-    const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${token}`;
+  const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${token}`;
 
-    return sendEmail({
-        to: email,
-        subject: '🔐 Reset your Pizza App password',
-        html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #e53935;">Password Reset Request 🔐</h1>
-        <p>Hi ${name},</p>
-        <p>We received a request to reset your password. Click the button below to create a new password.</p>
-        <a href="${resetUrl}" 
-           style="display: inline-block; background-color: #e53935; color: white; padding: 12px 24px; 
-                  text-decoration: none; border-radius: 4px; margin: 20px 0;">
-          Reset Password
-        </a>
-        <p>Or copy this link: ${resetUrl}</p>
-        <p>This link expires in 1 hour.</p>
-        <p>If you didn't request this, please ignore this email.</p>
-      </div>
-    `,
-    });
+  const html = `
+        <div style="font-family: 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;">
+            <h1 style="color: #e53935; font-size: 24px; margin-bottom: 8px;">Password Reset 🔑</h1>
+            <p style="font-size: 16px; color: #555;">Hey ${name},</p>
+            <p style="font-size: 15px; color: #666;">
+                We received a request to reset your password. Click the button below to choose a new one.
+            </p>
+            <a href="${resetUrl}" 
+               style="display: inline-block; margin: 24px 0; padding: 14px 32px; 
+                      background: linear-gradient(135deg, #e53935, #ff9800); color: #fff; 
+                      text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">
+                Reset Password
+            </a>
+            <p style="font-size: 13px; color: #999;">
+                This link expires in 1 hour. If you didn't request this, just ignore this email.
+            </p>
+            <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+            <p style="font-size: 12px; color: #bbb; text-align: center;">
+                SliceCraft — Craft your perfect slice.
+            </p>
+        </div>
+    `;
+
+  await sendEmail(email, 'Reset your SliceCraft password', html);
 };
 
-const sendLowStockAlert = async (adminEmail, ingredients) => {
-    const ingredientList = ingredients.map(i =>
-        `<li><strong>${i.name}</strong> (${i.type}): ${i.stock} remaining (threshold: ${i.threshold})</li>`
-    ).join('');
-
-    return sendEmail({
-        to: adminEmail,
-        subject: '⚠️ Low Stock Alert - Pizza App Inventory',
-        html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #ff9800;">⚠️ Low Stock Alert</h1>
-        <p>The following ingredients are running low:</p>
-        <ul style="list-style-type: none; padding: 0;">
-          ${ingredientList}
-        </ul>
-        <p>Please restock soon to avoid order disruptions.</p>
-        <a href="${process.env.CLIENT_URL}/admin/inventory" 
-           style="display: inline-block; background-color: #ff9800; color: white; padding: 12px 24px; 
-                  text-decoration: none; border-radius: 4px; margin: 20px 0;">
-          Manage Inventory
-        </a>
-      </div>
-    `,
-    });
-};
-
+// ── Order Status Update Email ──
 const sendOrderStatusEmail = async (email, name, orderId, status) => {
-    const statusMessages = {
-        RECEIVED: 'Your order has been received! 📋',
-        IN_KITCHEN: 'Your pizza is being prepared! 👨‍🍳',
-        SENT_TO_DELIVERY: 'Your pizza is on its way! 🚗',
-        DELIVERED: 'Your pizza has been delivered! Enjoy! 🍕',
-    };
+  const statusMessages = {
+    RECEIVED: { emoji: '📥', heading: 'Order Confirmed!', body: 'Your order has been received and is being prepared.' },
+    IN_KITCHEN: { emoji: '👨‍🍳', heading: 'Being Prepared!', body: 'Our chefs are crafting your pizza right now.' },
+    SENT_TO_DELIVERY: { emoji: '🚚', heading: 'On Its Way!', body: 'Your order is out for delivery. Get ready!' },
+    DELIVERED: { emoji: '✅', heading: 'Delivered!', body: 'Your order has been delivered. Enjoy your meal!' },
+    CANCELLED: { emoji: '❌', heading: 'Order Cancelled', body: 'Your order has been cancelled.' },
+  };
 
-    return sendEmail({
-        to: email,
-        subject: `🍕 Order Update: ${statusMessages[status] || status}`,
-        html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #e53935;">Order Update 🍕</h1>
-        <p>Hi ${name},</p>
-        <p><strong>Order #${orderId.slice(-8).toUpperCase()}</strong></p>
-        <h2 style="color: #4caf50;">${statusMessages[status] || status}</h2>
-        <a href="${process.env.CLIENT_URL}/orders" 
-           style="display: inline-block; background-color: #e53935; color: white; padding: 12px 24px; 
-                  text-decoration: none; border-radius: 4px; margin: 20px 0;">
-          View Order
-        </a>
-      </div>
-    `,
-    });
+  const info = statusMessages[status] || { emoji: '📦', heading: 'Status Update', body: `Your order status is now: ${status}` };
+
+  const html = `
+        <div style="font-family: 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;">
+            <h1 style="color: #e53935; font-size: 24px;">${info.emoji} ${info.heading}</h1>
+            <p style="font-size: 16px; color: #555;">Hey ${name},</p>
+            <p style="font-size: 15px; color: #666;">${info.body}</p>
+            <div style="margin: 20px 0; padding: 16px; background: #f8f8f8; border-radius: 8px;">
+                <p style="margin: 0; font-size: 14px; color: #888;">Order ID</p>
+                <p style="margin: 4px 0 0; font-size: 16px; font-weight: 600; color: #333;">
+                    #${orderId.slice(-8).toUpperCase()}
+                </p>
+            </div>
+            <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+            <p style="font-size: 12px; color: #bbb; text-align: center;">
+                SliceCraft — Craft your perfect slice.
+            </p>
+        </div>
+    `;
+
+  await sendEmail(email, `${info.emoji} ${info.heading} — Order #${orderId.slice(-8).toUpperCase()}`, html);
+};
+
+// ── Low Stock Alert Email ──
+const sendLowStockAlert = async (items) => {
+  const adminEmail = process.env.ADMIN_EMAIL;
+  if (!adminEmail) return;
+
+  const itemRows = items.map((item) =>
+    `<tr>
+            <td style="padding: 8px 12px; border-bottom: 1px solid #eee; font-weight: 500;">${item.name}</td>
+            <td style="padding: 8px 12px; border-bottom: 1px solid #eee; text-transform: capitalize;">${item.type}</td>
+            <td style="padding: 8px 12px; border-bottom: 1px solid #eee; color: #f44336; font-weight: 600;">${item.stock}</td>
+            <td style="padding: 8px 12px; border-bottom: 1px solid #eee;">${item.threshold}</td>
+        </tr>`
+  ).join('');
+
+  const html = `
+        <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 32px;">
+            <h1 style="color: #f44336; font-size: 22px;">⚠️ Low Inventory Alert</h1>
+            <p style="font-size: 15px; color: #666;">
+                The following items are running low. Consider restocking soon.
+            </p>
+            <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px;">
+                <thead>
+                    <tr style="background: #fafafa;">
+                        <th style="padding: 10px 12px; text-align: left; font-weight: 600;">Item</th>
+                        <th style="padding: 10px 12px; text-align: left; font-weight: 600;">Category</th>
+                        <th style="padding: 10px 12px; text-align: left; font-weight: 600;">Stock</th>
+                        <th style="padding: 10px 12px; text-align: left; font-weight: 600;">Threshold</th>
+                    </tr>
+                </thead>
+                <tbody>${itemRows}</tbody>
+            </table>
+            <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+            <p style="font-size: 12px; color: #bbb; text-align: center;">
+                SliceCraft Admin Notification
+            </p>
+        </div>
+    `;
+
+  await sendEmail(adminEmail, `⚠️ Low Inventory Alert — ${items.length} item(s)`, html);
 };
 
 module.exports = {
-    sendEmail,
-    sendVerificationEmail,
-    sendPasswordResetEmail,
-    sendLowStockAlert,
-    sendOrderStatusEmail,
+  sendVerificationEmail,
+  sendPasswordResetEmail,
+  sendOrderStatusEmail,
+  sendLowStockAlert,
 };

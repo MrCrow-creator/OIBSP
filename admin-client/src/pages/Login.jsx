@@ -46,10 +46,10 @@ export default function Login() {
                             <FaPizzaSlice />
                         </div>
                         <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.25rem' }}>
-                            Admin Portal
+                            SliceCraft Admin
                         </h1>
                         <p style={{ color: 'var(--color-gray-500)' }}>
-                            Sign in to manage your pizza shop
+                            Sign in to manage your shop
                         </p>
                     </div>
 
