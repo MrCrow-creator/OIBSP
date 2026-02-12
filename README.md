@@ -183,7 +183,7 @@ A default admin account is created during database initialization — check `ini
 
 ## Author
 
-**Kawal** - Built during my internship at Oasis Infobyte (OIBSIP).
+**Prasad Kawale** - Built during my internship at Oasis Infobyte (OIBSIP).
 
 ---
 
